@@ -192,7 +192,13 @@ def build_url(uids: list[int]) -> str:
 
 def http_get_json(url: str, cfg: dict) -> dict:
     ctx = ssl.create_default_context()
-    req = urllib.request.Request(url, headers=HEADERS)
+    headers = dict(HEADERS)
+    # 可选 Cookie（config.json 的 "cookie" 字段）：轮播房间的流地址
+    # 需要登录态才下发，直播中房间无 Cookie 也可用
+    cookie = str((cfg or {}).get("cookie") or "").strip()
+    if cookie:
+        headers["Cookie"] = cookie
+    req = urllib.request.Request(url, headers=headers)
     last_err = None
     retries = int(cfg.get("retries", 2))
     for attempt in range(1, retries + 2):
@@ -245,21 +251,30 @@ def parse_roomplayinfo_payload(payload: dict) -> str:
 
 
 def fetch_stream_url(room_id: int, cfg: dict) -> str:
-    """点击「播放」时实时取直链（带 Referer 校验的短时效地址，不能缓存）。"""
+    """点击「播放」时实时取直链（带 Referer 校验的短时效地址，不能缓存）。
+
+    顺序：v2 getRoomPlayInfo（直播中房间可用，无需登录）→ 老 playUrl 兜底。
+    注意：轮播中（live_status=2）的房间两者都可能被服务端拒绝——实测
+    未登录时 v2 返回空 stream、playUrl 返回的 CDN 地址 404（2026-11 实测），
+    拿轮播流需要登录态 Cookie（config.json 的 "cookie" 字段）。
+    """
     errors = []
+    try:
+        p = http_get_json(
+            "%s?room_id=%s&protocol=0,1&format=0,1,2&codec=0,1&qn=10000"
+            "&platform=web&ptype=8&dolby=5&panorama=1" % (API_ROOMPLAYINFO, room_id), cfg)
+        return parse_roomplayinfo_payload(p)
+    except Exception as e:  # noqa: BLE001
+        errors.append("getRoomPlayInfo: %s" % e)
     try:
         p = http_get_json("%s?cid=%s&qn=0&platform=web&otype=json" % (API_PLAYURL, room_id), cfg)
         return parse_playurl_payload(p)
     except Exception as e:  # noqa: BLE001
         errors.append("playUrl: %s" % e)
-    try:
-        p = http_get_json(
-            "%s?room_id=%s&protocol=0,1&format=0,1,2&codec=0,1,2&qn=0&platform=web&ptype=8"
-            % (API_ROOMPLAYINFO, room_id), cfg)
-        return parse_roomplayinfo_payload(p)
-    except Exception as e:  # noqa: BLE001
-        errors.append("getRoomPlayInfo: %s" % e)
-    raise RuntimeError("获取直播流失败 -> " + " | ".join(errors))
+    raise RuntimeError(
+        "获取直播流失败 -> %s。若该房间正在轮播：B 站对未登录请求不下发轮播流，"
+        "可在 config.json 填 \"cookie\"（浏览器登录 Cookie）后重试"
+        % " | ".join(errors))
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +320,9 @@ def find_player(cfg: dict, which=None, exists=None):
 def build_player_cmd(kind: str, exe: str, url: str, audio_only: bool, cfg: dict = None) -> list:
     """构造播放命令（纯函数）。所有播放器都必须带 Referer + UA，否则 B 站 CDN 返回 403。"""
     if kind == "vlc":
-        cmd = [exe, "--no-one-instance", "--play-and-exit", "--no-video-title-show"]
+        # 不用 --play-and-exit：直播流断开/打开失败时 VLC 窗口会停留并显示
+        # 错误，而不是静默闪退（用户曾因 404 流 + play-and-exit 以为「闪退」）
+        cmd = [exe, "--no-one-instance", "--no-video-title-show"]
         if audio_only:
             # 只禁用视频画面，但【保留 VLC 自己的 GUI 窗口】：
             # 用户可在 VLC 窗口里暂停/继续/调音量/关闭，Python 弹窗不复制这些控制。

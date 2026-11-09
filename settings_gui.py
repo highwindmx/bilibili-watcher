@@ -57,6 +57,7 @@ GLOBAL_FIELDS = [
     ("http_timeout", "请求超时(秒)", "int", 10, ""),
     ("notify_on_start", "启动时已在直播也提醒", "bool", True, ""),
     ("notify_on_end", "下播也提醒", "bool", False, ""),
+    ("cookie", "B 站 Cookie(可选)", "str", "", "轮播房间拉流需登录态；从浏览器复制整串 Cookie"),
 ]
 
 EMAIL_FIELDS = [

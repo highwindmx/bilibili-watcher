@@ -283,16 +283,23 @@ check("getRoomPlayInfo 优先 http_stream 并正确拼接",
       w.parse_roomplayinfo_payload(rpi) == "https://cdn.example/a.flv?expires=2",
       w.parse_roomplayinfo_payload(rpi))
 
-print("\n[18] fetch_stream_url：主接口失败时回退备用接口")
-w.http_get_json = lambda url, c: (pu if "Room/playUrl" in url else rpi)
-check("主接口可用时取主接口", w.fetch_stream_url(1496449, base_cfg()) == "https://cdn.example/a.flv?expires=1")
-def failing_primary(url, c):
-    if "Room/playUrl" in url:
-        raise RuntimeError("mock 403")
-    return rpi
-w.http_get_json = failing_primary
-check("主接口失败回退 getRoomPlayInfo",
+print("\n[18] fetch_stream_url：v2 优先，失败回退 playUrl，全失败抛错并提示 cookie")
+w.http_get_json = lambda url, c: (rpi if "getRoomPlayInfo" in url else pu)
+check("v2 可用时优先取 v2",
       w.fetch_stream_url(1496449, base_cfg()) == "https://cdn.example/a.flv?expires=2")
+def failing_v2(url, c):
+    if "getRoomPlayInfo" in url:
+        raise RuntimeError("mock v2 空 stream")
+    return pu
+w.http_get_json = failing_v2
+check("v2 失败回退 playUrl",
+      w.fetch_stream_url(1496449, base_cfg()) == "https://cdn.example/a.flv?expires=1")
+w.http_get_json = lambda url, c: {"code": -400}
+try:
+    w.fetch_stream_url(1496449, base_cfg())
+    check("两接口全失败应抛错", False)
+except RuntimeError as e:
+    check("两接口全失败应抛错且提示 cookie", "cookie" in str(e), str(e)[:80])
 
 print("\n[19] find_player：显式路径 / PATH / 常见安装路径")
 cfg = base_cfg(player={"vlc_path": r"C:\My\vlc.exe", "prefer": ["vlc", "mpv", "ffplay"]})
