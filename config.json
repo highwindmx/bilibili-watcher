@@ -1,0 +1,42 @@
+{
+  "interval": 180,
+  "desktop": true,
+  "sound": true,
+  "native_toast": false,
+  "open_browser": false,
+  "notify_on_start": true,
+  "notify_on_end": false,
+  "debounce_polls": 1,
+  "http_timeout": 10,
+  "retries": 2,
+
+  "streamers": [
+    {
+      "uid": 48330353,
+      "name": "双尾彗星",
+      "channels": ["desktop", "sound", "email"]
+    },
+    {
+      "uid": 2,
+      "name": "碧诗（示例：只发邮件）",
+      "channels": ["email"]
+    }
+  ],
+
+  "player": {
+    "vlc_path": null,
+    "mpv_path": null,
+    "ffplay_path": null,
+    "prefer": ["vlc", "mpv", "ffplay"]
+  },
+
+  "email": {
+    "enabled": false,
+    "smtp_host": "smtp.qq.com",
+    "smtp_port": 465,
+    "use_ssl": true,
+    "username": "你的QQ号@qq.com",
+    "password": "邮箱授权码（不是登录密码）",
+    "to": ["收件邮箱@example.com"]
+  }
+}

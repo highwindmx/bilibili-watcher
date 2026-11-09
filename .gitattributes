@@ -1,0 +1,20 @@
+# win-env-kit rule 2: default LF, CRLF only for Windows-native scripts
+* text=auto eol=lf
+
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.reg   text eol=crlf
+
+# Binary artefacts: never touch line endings
+*.ico   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.zip   binary
+*.exe   binary
+*.dll   binary
+*.pdf   binary
